@@ -29,7 +29,10 @@ public class centroid {
 	static HashMap <Integer,Integer> docID_outpput_docID = new LinkedHashMap<Integer,Integer>();
 	static HashMap<Integer,String> docID_classlabel = new LinkedHashMap<Integer,String>();
 	
-	static 
+	static ArrayList<Integer> trainset = new ArrayList<Integer>();
+	static ArrayList<Integer> testset = new ArrayList<Integer>();
+	
+	
 	
 	static int feature_representation_option =1;
 	
