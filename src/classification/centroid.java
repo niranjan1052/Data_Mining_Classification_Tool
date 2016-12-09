@@ -29,15 +29,27 @@ public class centroid {
 	static HashMap <Integer,Integer> docID_outpput_docID = new LinkedHashMap<Integer,Integer>();
 	static HashMap<Integer,String> docID_classlabel = new LinkedHashMap<Integer,String>();
 	
+	
+	static HashMap<Integer,String> predicted_docID_classlabels = new LinkedHashMap<Integer,String>();
+	
+	static HashMap<String,ArrayList<Integer>> label_docids = new HashMap<String, ArrayList<Integer>>();
+	
 	static ArrayList<Integer> trainset = new ArrayList<Integer>();
 	static ArrayList<Integer> testset = new ArrayList<Integer>();
 	
+	static HashMap<String,Integer> classlabelmap = new LinkedHashMap<String,Integer>();
 	
+	static int feature_representation_option =0;
 	
-	static int feature_representation_option =1;
-	
-	static String inputfile,outputfile, trainfile, testfile, feature_labelfile;
+	static String outputfile;
+	static String trainfile = "./20newsgroups.train";
+	static String testfile = "./20newsgroups.test";
+	static String feature_labelfile;
 	static String input_rlabelfile= "./20newsgroups.rlabel";
+	
+	static String inputfile= "./20newsgroups_word.ijv";
+	
+	static each_class[] global_clusters = new each_class[20];
 	
 	public static void readinputfile () {
 		 System.out.println("\n Readling input file \n");
@@ -101,12 +113,54 @@ public class centroid {
 				outputdocid = Integer.parseInt(line.split(" ")[2]);
 				docID_classlabel.put(docid,classlabel);
 				docID_outpput_docID.put(docid,outputdocid);
+				if(!label_docids.containsKey(classlabel)){             // map classlabel to the list of corresponding doc ids
+					ArrayList<Integer> docidlist = new ArrayList<Integer>();
+					docidlist.add(docid);
+					label_docids.put(classlabel,docidlist);
+					
+				}else{
+					ArrayList<Integer> docids = label_docids.get(classlabel);
+					docids.add(docid);
+					label_docids.put(classlabel, docids);
+				}
+				
+				if(!classlabelmap.containsKey(classlabel)){       // map of class labels to numerical numbers
+					classlabelmap.put(classlabel, (classlabelmap.size()+1));
+				}
 			}
 			
 		}catch (Exception e){
-			
+			System.out.println(e.getMessage());
 		}
 		
+		
+		// read file to populate training set
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(trainfile));
+			String line = null;
+			int docid ;
+			while((line=br.readLine())!=null){
+				docid = Integer.parseInt(line);
+				trainset.add(docid);
+			}
+			
+		}catch (Exception e){
+			System.out.println("error reading trainfile");
+		}
+		
+		// read file to populate test set
+				try {
+					BufferedReader br = new BufferedReader(new FileReader(testfile));
+					String line = null;
+					int docid ;
+					while((line=br.readLine())!=null){
+						docid = Integer.parseInt(line);
+						testset.add(docid);
+					}
+					
+				}catch (Exception e){
+					System.out.println(e.getMessage());
+				}
 		
 	}
 	
@@ -117,6 +171,111 @@ public class centroid {
 		outputfile = "classification_colution";
 		readinputfile();
 		
+		//for(String classname : label)
+	//	for(Map.Entry m : label_docids.entrySet()){
+		//	System.out.println(m.getKey() + " - "+ m.getValue());
+	//	}
+		System.out.println("Done reading input files .. Calucating centroids .. ");
+		int i=0;
+		
+		for( String classname : label_docids.keySet()){
+			
+			each_class obj = new each_class();
+			obj.classlabel = classname;
+			obj.documentIDs = label_docids.get(classname);
+			int restdocsize = docID_TF_Vector.size() - obj.documentIDs.size();
+			for ( int docid : trainset ) 
+			{
+				if( obj.documentIDs.contains(docid)){
+				HashMap<Integer,Float> termvector = unit_docID_TF_Vector.get(docid);
+				for( int termid : termvector.keySet()){
+					if(!(obj.positivecentroid.containsKey(termid))){
+						obj.positivecentroid.put(termid, (termvector.get(termid)/obj.documentIDs.size()));
+					}else{
+						float sum = obj.positivecentroid.get(termid);
+						sum+= (termvector.get(termid)/obj.documentIDs.size());
+						obj.positivecentroid.put(termid,sum);
+					}
+				}           // end of loop to find positive centroid
+				
+			}
+				else {
+					HashMap<Integer,Float> termvector = unit_docID_TF_Vector.get(docid);
+					for( int termid : termvector.keySet()){
+						if(!(obj.negativecentroid.containsKey(termid))){
+							obj.negativecentroid.put(termid, (termvector.get(termid)/restdocsize));
+						}else{
+							float sum = obj.negativecentroid.get(termid);
+							sum+= (termvector.get(termid)/restdocsize);
+							obj.negativecentroid.put(termid,sum);
+						}
+					}           // end of loop to find positive centroid
+								
+				}
+			}
+			global_clusters[i++]= obj;
+		}
+		
+		System.out.println("Training phase done.. cetnroids found for 20 binary classifiers ");
+		
+		for ( int docid : testset){
+			float positive_similarity=0;
+			float negative_similarity=0;
+			System.out.println(docid );
+			HashMap<Integer,Float> termvector =  unit_docID_TF_Vector.get(docid);
+			float similarity_diff, max_similarity_diff=-2;
+			for(each_class obj : global_clusters ){
+				positive_similarity = find_similarity(termvector, obj.positivecentroid) ;
+				negative_similarity = find_similarity(termvector, obj.negativecentroid) ;
+				similarity_diff = positive_similarity - negative_similarity;
+				System.out.println(similarity_diff );
+				if(similarity_diff>max_similarity_diff){
+					max_similarity_diff = similarity_diff;
+					//docID_classlabel.put(docid, obj.classlabel);
+					predicted_docID_classlabels.put(docid,obj.classlabel);
+				}
+				
+			}
+		}
+		
+		System.out.println(" each test instance ran");
+		
+		for( Map.Entry m : predicted_docID_classlabels.entrySet()){
+			System.out.println(m.getKey() + " - "+m.getValue());
+		}
+		
+		
+	}   // End of main 
+	
+	public static float find_similarity(HashMap<Integer,Float> x , HashMap<Integer,Float> y){
+		HashMap<Integer,Float> small,large;
+		if(x.size()<y.size()){
+			small = x;
+			large= y;
+		}else{
+			small=y;
+			large=x;
+		}
+		float sum =0;
+		for(int termid : small.keySet()){
+			
+			if(large.containsKey(termid)){
+				sum += small.get(termid)*large.get(termid);
+			}
+		}
+		
+		
+		return sum;
+		
 	}
 
+}
+
+
+class each_class{
+	ArrayList<Integer> documentIDs ;
+    HashMap<Integer,Float> positivecentroid ;
+    HashMap<Integer,Float> negativecentroid;
+   String classlabel;
+   
 }
