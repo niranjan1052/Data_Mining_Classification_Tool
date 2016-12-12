@@ -11,7 +11,14 @@ public class regression {
 	//stores the document term frequency represented vectors
 	static Map<Integer, HashMap<Integer, Double>> unit_docID_TF_Vector = new LinkedHashMap<Integer, HashMap<Integer,Double>>();
 	//stores the document term frequency represented vectors normalised to unit length
-		
+		static double lambda = 0.2;
+	static LinkedHashMap<Integer, LinkedHashMap<Integer, Double>> train_unit_docid_TF_Vecotr = new LinkedHashMap<Integer, LinkedHashMap<Integer,Double>>();
+	//stores the training set document term frequency represented vectors normalised to unit length
+	
+	static Map<Integer, HashMap<Integer, Double>> test_unit_docid_TF_Vecotr = new LinkedHashMap<Integer, HashMap<Integer,Double>>();
+	//stores the test set document term frequency represented vectors normalised to unit length
+	
+	
 	static Map<Integer, HashMap<Integer,Double>> docID_TF_IDF_Vector = new LinkedHashMap<Integer, HashMap<Integer,Double>>();
    //stores the TF*IDF representation of the document vectors
 	
@@ -21,10 +28,13 @@ public class regression {
 	// stores the IDf value of each term to be used in creation of IDF repesentation vector
 	
 	static HashMap <Integer,Integer> docID_outpput_docID = new LinkedHashMap<Integer,Integer>();
+	
 	static HashMap<Integer,String> docID_classlabel = new LinkedHashMap<Integer,String>();
+	//data from rlabel file each docid and its label
 	static HashMap<String,HashMap<Integer,Double> >  class_docid_wscores = new LinkedHashMap<String, HashMap<Integer,Double> > ();   
 	// stores the classlabel and a hashmap of wscores for each of the document ids
 	
+	static int no_of_attributes = 71944;
 	static HashMap<Integer,String> predicted_docID_classlabels = new LinkedHashMap<Integer,String>();
 	
 	static HashMap<String,ArrayList<Integer>> label_docids = new LinkedHashMap<String, ArrayList<Integer>>();
@@ -42,12 +52,30 @@ public class regression {
 	static String testfile = "./20newsgroups.test";
 	static String feature_labelfile;
 	static String input_rlabelfile= "./20newsgroups.rlabel";
+	static String wordlabelfile = "./20newsgroups_word.clabel";
 	
+	static ArrayList<Integer> feature_labels = new ArrayList<Integer>();
 	static String inputfile= "./20newsgroups_word.ijv";
 	
 	static each_class[] global_clusters = new each_class[20];
 	
 	public static void readinputfile () {
+		// read file to populate training set
+				try {
+					BufferedReader br = new BufferedReader(new FileReader(trainfile));
+					String line = null;
+					int docid ;
+					while((line=br.readLine())!=null){
+						docid = Integer.parseInt(line);
+						trainset.add(docid);
+					}
+					
+				}catch (Exception e){
+					System.out.println("error reading trainfile");
+				}
+				
+		
+		
 		 System.out.println("\n Readling input file \n");
 		try{
 			BufferedReader br = new BufferedReader( new FileReader(inputfile));
@@ -68,7 +96,7 @@ public class regression {
 				if(!docID_TF_Vector.containsKey(docid)){
 					HashMap<Integer,Integer> term_freq_vector = new HashMap<Integer,Integer>();
 					term_freq_vector.put(termid, termfreq);
-				    docID_TF_Vector.put(docid, term_freq_vector);
+					docID_TF_Vector.put(docid, term_freq_vector);
 				    
 			    	vectorlength=0;
 				 }
@@ -85,20 +113,24 @@ public class regression {
 			
 			for(int documentid : docID_TF_Vector.keySet() ){                // Normalise the document vectors
 				HashMap<Integer,Integer> wordvector = docID_TF_Vector.get(documentid);
-				HashMap<Integer,Double> unitwordvector = new HashMap<Integer,Double>();
+				LinkedHashMap<Integer,Double> unitwordvector = new LinkedHashMap<Integer,Double>();
 				Double docvectorlength = docID_length.get(documentid);
 				for ( int wordid : wordvector.keySet()){
 					unitwordvector.put(wordid, wordvector.get(wordid)/docvectorlength);
 				}
+				if(trainset.contains(documentid)){
+					train_unit_docid_TF_Vecotr.put(documentid,unitwordvector);
+				}
+				else if( testset.contains(documentid))
+				{
+				   test_unit_docid_TF_Vecotr.put(documentid,unitwordvector);
+				}
 				unit_docID_TF_Vector.put(documentid,unitwordvector);
-			//	if(documentid==5719){
-			//		System.out.println("for 5719 ");
-			//		System.out.println(wordvector);
-			//		System.out.println(docvectorlength);
-			//		System.out.println(unitwordvector);
-			//	} 
+			
 			}
-					
+			
+		  	docID_TF_Vector.clear();	
+			unit_docID_TF_Vector.clear();
 		}
 		catch(Exception e){
 			System.out.println("file read error "+e.getMessage());
@@ -139,19 +171,6 @@ public class regression {
 		}
 		
 		
-		// read file to populate training set
-		try {
-			BufferedReader br = new BufferedReader(new FileReader(trainfile));
-			String line = null;
-			int docid ;
-			while((line=br.readLine())!=null){
-				docid = Integer.parseInt(line);
-				trainset.add(docid);
-			}
-			
-		}catch (Exception e){
-			System.out.println("error reading trainfile");
-		}
 		
 		// read file to populate test set
 				try {
@@ -167,389 +186,242 @@ public class regression {
 					System.out.println(e.getMessage());
 				}
 		
+				//populate all the feauture labels
+		  try{
+			   BufferedReader br = new BufferedReader (new FileReader(wordlabelfile));
+			   String line = null;
+				int termid=1 ;
+				while((line=br.readLine())!=null){
+					  termid++;
+					  feature_labels.add(termid);
+				}	
+					
+		  }catch (Exception e){
+				System.out.println(e.getMessage());
+		  }		
+				
+				
 	}
+	
+	
+	
 	
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
-		inputfile = "./20newsgroups_word.ijv";
+       long startTime = System.nanoTime();
+			
+	//	inputfile = "./20newsgroups_word.ijv";
 	//	outputfile = "classification_colution";
 		readinputfile();
 		
 		
-		System.out.println("Done reading input files .. Calucating centroids .. ");
-		centroid centroidobj = new centroid();
+		System.out.println("Done reading input files .. Calucating w .. ");
+		regression ridgeobj = new regression();
 		
-		centroidobj.calc_centroid();
+		System.out.println(" Calucalting W  ");
+		
+		ridgeobj.calc_w_regression();
 		
 		System.out.println("Training phase done.. cetnroids found for 20 binary classifiers ");
 		System.out.println("testset len "+ testset.size());
 		
 		HashMap<Integer,Double> docid_wscore = new HashMap<Integer,Double>(); 
 		
-		for ( int docid : testset){
-			if(docid == 5719){
-				System.out.println("inside testinf 5719 ");
-			}
-			double positive_similarity=0;
-			double negative_similarity=0;
 		
-			HashMap<Integer,Double> termvector =  unit_docID_TF_Vector.get(docid);
-			double similarity_diff, max_similarity_diff=-2;
-			HashMap< String, Double> class_wscores = new LinkedHashMap<String,Double>();   // stores the document id and wscores for a particular class 
-			for(each_class obj : global_clusters ){
-				
-				positive_similarity = find_similarity(termvector, obj.unit_positivecentroid) ;
-				negative_similarity = find_similarity(termvector, obj.unit_negativecentroid) ;
-				similarity_diff = positive_similarity - negative_similarity;
-				 class_wscores.put(obj.classlabel,similarity_diff);
-					
-				if(similarity_diff>max_similarity_diff){
-					max_similarity_diff = similarity_diff;
-					predicted_docID_classlabels.put(docid,obj.classlabel);
-				}
-								
-			}
-		
-			for(Map.Entry<String,Double> m:  class_wscores.entrySet()){
-				
-				
-				if( class_docid_wscores.containsKey(m.getKey())){    // check if the class entry is present in the global mapping 
-					
-					docid_wscore = class_docid_wscores.get(m.getKey());          //if present extract the hashmap of wscores for this class 
-					
-					docid_wscore.put(docid, m.getValue());     // updates the global class_docid_wscores for the document id of testfile for each class 
-					class_docid_wscores.put(m.getKey(), docid_wscore);       //insert back the updated wscores data for current document id. 
-				
-				}
-				else {
-					
-					HashMap<Integer,Double > document_wscore = new HashMap<Integer,Double> ();             // else create a new entry for the class with a new document_wscore hashmap
-					document_wscore.put(docid, m.getValue());
-					class_docid_wscores.put(m.getKey(),document_wscore );
-					
-				}
-						
-			}
-			
-			
-		} //   End of loop to run for each test instance
-	
+		long endTime = System.nanoTime();
+		System.out.println("Took "+((endTime - startTime)/1000000000) + " seconds"); 
 		
 		
-		System.out.println(" each test instance ran mm "+ predicted_docID_classlabels.size());
+		
 		
 	//	for( Map.Entry m : predicted_docID_classlabels.entrySet()){
 	//		 System.out.println(m.getKey() + " - "+m.getValue());
 	//	}
 		
-		centroidobj.write_classification_outputfile(outputfile);
+	//	centroidobj.write_classification_outputfile(outputfile);
 		
-		calc_accuracy();
+	//	calc_accuracy();
 		
-		calc_f1value();
-		
-		
-		System.out.println("\n Printing the max F1 values for each class ");
-	for ( Map.Entry<String,Double> m : class_maxf1value.entrySet()){
-		
-		System.out.println(m.getKey() +" - "+m.getValue());
-	}
+//		calc_f1value();
 		
 		
+	//	System.out.println("\n Printing the max F1 values for each class ");
+//	for ( Map.Entry<String,Double> m : class_maxf1value.entrySet()){
 		
-		
+//		System.out.println(m.getKey() +" - "+m.getValue());
+//	}
+
+	
 	}   // End of main 
 	
-	
-	
-	
-	public static void calc_f1value(){
+	public  void calc_w_regression()
+	{
+	   System.out.println("insisde calc_W function");
+	   int classno=0;
+	   LinkedHashMap<Integer,Double> ymatrix = new LinkedHashMap<Integer,Double>();
 		
-		
-		for ( String classname: class_docid_wscores.keySet()){
+	   for( String classname : label_docids.keySet())
+	   {
+			if(classno>=1) break;
+			//populate y matrix for current +ve class
 			
-			HashMap<Integer,Double> docid_wscore = class_docid_wscores.get(classname);
-			
-			HashMap<Integer,Double> sorted_docid_wscore =  sortByValue(docid_wscore);
-		ArrayList<Double> f1values = new ArrayList<Double>();
-			 int flagcount=0;
-			ArrayList<Integer> positiveids  = new ArrayList<Integer>();
-			for ( int docid : sorted_docid_wscore.keySet()){            
-				double score= sorted_docid_wscore.get(docid);
-				int TP=0, FP=0,FN=0;
-				positiveids.add(docid);
+			for(int recid : trainset){
+				if(docID_classlabel.get(recid).equals(classname))
+					ymatrix.put(recid,1.0);
+				else
+					ymatrix.put(recid,0.0);
 				
-				for(int i =0;i<positiveids.size();i++){
-					if( classname.equals(docID_classlabel.get(positiveids.get(i)))  ){
-					    // if the current positive is +ve in ground truth
-						TP++;
-						
-					}
-					else {
-						FP++;
-					}
-									
-				}
-				
-				FN= label_docids.get(classname).size() - TP;
-				
-			  double prec_positive = (double)TP/(TP+FP);
-			  double rec_positive = (double) TP/(TP+FN);
-			  
-			  double F1_positive =0.0;
-			  if(prec_positive!=0.0 && rec_positive!=0.0)
-			  {
-				  F1_positive= 2 * (prec_positive * rec_positive) /   (prec_positive + rec_positive);
-			  }
-			  
-			  f1values.add(F1_positive);
-			  if(classname.equalsIgnoreCase("comp.sys.ibm.pc.hardware") && flagcount <10 ){
-				 // System.out.println("docid - "+ docid+ "wscore "+" "+score+" f1value "+ F1_positive);
-				  System.out.println("docid - "+ docid+ "wscore "+" "+score+" f1value "+ F1_positive+ " prec "+prec_positive+ " rec "+rec_positive);
-			      System.out.println("TP "+TP+" FP "+ FP +" FN "+ FN);
-			  }
-			  flagcount++;
 			}
-			
-			double max_f1value = Collections.max(f1values);
-		  class_maxf1value.put(classname,max_f1value);	
-			
-		}    //end of loop to find max f1 value for individual class
-		
-				
-	}   // end of function to calculate f1 values for all class
-	
-	
-	public static HashMap<Integer, Double> sortByValue(HashMap<Integer, Double> unsortMap)
-    {
-
-        List<Entry<Integer, Double>> list = new LinkedList<Entry<Integer, Double>>(unsortMap.entrySet());
-
-        // Sorting the list based on values
-        Collections.sort(list, new Comparator<Entry<Integer, Double>>()
-        {
-            public int compare(Entry<Integer, Double> o1,
-                    Entry<Integer, Double> o2)
-            {
-               
-                    return o2.getValue().compareTo(o1.getValue());
-
-                
-            }
-        });
-
-        // Maintaining insertion order with the help of LinkedList
-        HashMap<Integer, Double> sortedMap = new LinkedHashMap<Integer, Double>();
-        for (Entry<Integer, Double> entry : list)
-        {
-        	int key = entry.getKey();
-        	double val = entry.getValue();
-            sortedMap.put(key, val);
-        }
-
-        return sortedMap;
-    }
-	
-	
-	
-	public void write_classification_outputfile(String outfile){
-		
-		try{
-			BufferedWriter bw = new BufferedWriter(new FileWriter (outfile));
-			String line="";
-			int outdocid;
-			for(Map.Entry<Integer,String> m : predicted_docID_classlabels.entrySet()){
-				
-				outdocid = docID_outpput_docID.get(m.getKey());
-				line = m.getKey()+ " "+m.getValue() +" "+ outdocid;
-				bw.write(line);
-				bw.newLine();
-			}
-			
-			
-			
-			bw.close();
-		}
-		catch( Exception e){
-			System.out.println(e.getMessage());
-		}
-	}
-	
-	
-	public static void calc_accuracy(){
-		
-		String original_class,pred_class;
-		int TP=0,TN=0,FP=0,FN=0;
-		String str ="alt.atheism";
-		int x=0;
-		for(int docid : predicted_docID_classlabels.keySet() ){
-			x++;
-			//if( docID_classlabel.get(docid).equals(str) && docid >=1 && docid <=74) 
-			{
-				// x++;
-			if ( docID_classlabel.get(docid).equals(predicted_docID_classlabels.get(docid)) ){
-				TP++;
-			}
-			else{
-				FP++;
-			}
-			
-			}
-		}
-		
-		double accuracy = (double)TP/x;
-		System.out.println("The accuracy is " + accuracy );
-	}
-	
-	
-	
-	public static double find_similarity(HashMap<Integer,Double> x , HashMap<Integer,Double> y){
-		HashMap<Integer,Double> small,large;
-		if(x.size()<y.size()){
-			small = x;
-			large= y;
-		}else{
-			small=y;
-			large=x;
-		}
-		double sum =0;
-		for(int termid : small.keySet()){
-			
-			if(large.containsKey(termid)){
-				sum += small.get(termid)*large.get(termid);
-			}
-		}
-		
-		
-		return sum;
-		
-	}
-	
-	public  void calc_centroid(){
-		System.out.println("insisde calc_centroid function");
-		int i=0;
-	for( String classname : label_docids.keySet()){
 			
 			each_class obj = new each_class();
 			obj.classlabel = classname; 
 			
 			int alt_pos_vlen1=0;
 			obj.documentIDs = label_docids.get(classname);
-			//System.out.println(obj.classlabel);
-		   int poscount=0,negcount=0;
-		
-			for ( int docid : trainset ) 
-			{
+			LinkedHashMap<Integer,Double> xitranspose = new LinkedHashMap<Integer,Double>();
+	     	LinkedHashMap<Integer,LinkedHashMap<Integer,Double>> X_i = new LinkedHashMap<Integer,LinkedHashMap<Integer,Double>>();
+			LinkedHashMap<Integer,Double> W = new LinkedHashMap<Integer,Double>();
+			//stores the term or column number and its w value	
 			
-				if( docID_classlabel.get(docid).equals(obj.classlabel)){
-					poscount++;
-				HashMap<Integer,Double> termvector = unit_docID_TF_Vector.get(docid);
-			
-				for( int termid : termvector.keySet()){
-					
-					if(!(obj.positivecentroid.containsKey(termid))){
-						obj.positivecentroid.put(termid, (termvector.get(termid)));
-					}else{
-						double sum = obj.positivecentroid.get(termid);
-						sum= (Math.round(sum * 100000000) / 100000000.0);
-						sum+= (termvector.get(termid));
-						sum= (Math.round(sum * 100000000) / 100000000.0);
-						obj.positivecentroid.put(termid,sum);
-					}
-				}           // end of loop to find positive centroid
+			for(int i=1;i<=no_of_attributes;i++){
+				
+				W.put(i,0.3);
 				
 			}
-				else {
-				//	System.out.println(docid);
-					negcount++;
-					HashMap<Integer,Double> termvector = unit_docID_TF_Vector.get(docid);
-					
-					for( int termid : termvector.keySet()){
+			
+			System.out.println("done populating w");
+			double wdenominator,wnumerator,finalwi;
+			LinkedHashMap<Integer,Double> w_i = new LinkedHashMap<Integer,Double>();
+			int featurecount =0;
+			double total_error=0,prev_error=0;
+		    for(int i : feature_labels )
+		     {     // i is the column label or the termid / feature no from i,j,v file 
+		       // System.out.println("\n value of i -- " + i) ;
+			    w_i.putAll(W);
+			    for(int j : train_unit_docid_TF_Vecotr.keySet())   // j is the document id, so for each roc id i.e each row in matrix
+			      {  
+					HashMap<Integer,Double> row = train_unit_docid_TF_Vecotr.get(j);
+					if(row.get(i)!=null  )
+				      {	
 						
-						if(!(obj.negativecentroid.containsKey(termid))){
-							obj.negativecentroid.put(termid, (termvector.get(termid)));
-						}else{
-							double sum = obj.negativecentroid.get(termid);
-							sum= (Math.round(sum * 100000000) / 100000000.0);
-							sum+= (termvector.get(termid));
-							sum= (Math.round(sum * 100000000) / 100000000.0);
-							obj.negativecentroid.put(termid,sum);
-						}
-					}           // end of loop to find positive centroid
-								
-				}
-			}
-			
-			
-			double centroid_length = 0;
-			// divide by no of +ve documents
-			for( int termid : obj.positivecentroid.keySet()){
-				double sum = obj.positivecentroid.get(termid);
-				sum=sum/poscount;
-				sum= (Math.round(sum * 100000000) / 100000000.0);
-				obj.positivecentroid.put(termid,sum);
-				centroid_length += (sum*sum);
-			}
-			
-			centroid_length = (double)Math.sqrt(centroid_length);
-			// normailzie the centroid vectors
-			for( int termid : obj.positivecentroid.keySet()){
-				double sum = obj.positivecentroid.get(termid);
-				sum=sum/centroid_length;
-				sum= (Math.round(sum * 100000000) / 100000000.0);
-				obj.unit_positivecentroid.put(termid,sum);
+						xitranspose.put(j, row.get(i));
+					  }
+										
+					LinkedHashMap<Integer,Double> rowwithoutcoli = new LinkedHashMap<Integer,Double>();
 				
-			}
-			
-			
-			double neg_centroid_length = 0;
-			// divide by no of +ve documents
+				    for(Map.Entry<Integer,Double> m : row.entrySet()){
+				    	if(m.getKey()!=i)
+				    	{	
+				       	    rowwithoutcoli.put(m.getKey(), m.getValue());
+				    	}
+				     }
+			           // get the matrix without column i values  in X_i
+			       X_i.put(j, rowwithoutcoli);
+				 		
+			     }      // end of looping all rows for a column i
+				
+		         w_i.remove(i);
+								           
+	             LinkedHashMap<Integer,Double>  xi_dot_wi = matrix_vector_multiplication(X_i,w_i);        
+	             LinkedHashMap<Integer,Double> yminusxiwi = vector_minus_vector(ymatrix,xi_dot_wi);
+	         	           
+	             wnumerator = vector_vector_multiplication(xitranspose,yminusxiwi);
+	             wdenominator = vector_vector_multiplication(xitranspose,xitranspose);        
+	             wdenominator += lambda;
+	             finalwi  =  (double)wnumerator/wdenominator ; 
+	             //  global_w.add(finalwi);
+	             //  System.out.println("wi value for column no "+i+ " is  "+ finalwi);
+              
+	             W.put(i, finalwi);
+			     w_i.clear();
+			     X_i.clear();
+			     xitranspose.clear();
+			     //calculation of least square error 
+			     if(featurecount%1000 ==0 )
+			     { 
+				   LinkedHashMap<Integer,Double> XdotW  = matrix_vector_multiplication(train_unit_docid_TF_Vecotr, W); 
+			     
+				
+			       HashMap<Integer,Double> XdotWminusY = vector_minus_vector(XdotW,ymatrix);
+				    total_error=0;
+				   for(Map.Entry<Integer,Double> m : XdotWminusY.entrySet()){
 					
-			for( int termid : obj.negativecentroid.keySet()){
-				double sum = obj.negativecentroid.get(termid);
-				sum=sum/negcount;
-				sum= (Math.round(sum * 100000000) / 100000000.0);
-				obj.negativecentroid.put(termid,sum);
-				neg_centroid_length += (sum*sum);
+					  total_error+= (m.getValue()*m.getValue());
+				   }
 				
-				
-			}
+				   
+				    System.out.println("\n Total least square error for iteration of i = "+ i+ " is "+ total_error);
+				    System.out.println("change in error is "+ (total_error-prev_error));
+				    if(total_error-prev_error<1 && total_error-prev_error>0){
+					  System.out.println("Coverged ");
+					  break;
+				    }
+				   prev_error= total_error;
+			      }
+			     featurecount++;
+			     if(featurecount>70000)
+				   break;
+			   
+			}   // end of calculation of wi for column i
+			global_clusters[classno++]= obj;
 			
-			neg_centroid_length = (double)Math.sqrt(neg_centroid_length);
-			// normailzie the centroid vectors
-			for( int termid : obj.negativecentroid.keySet()){
-				double sum = obj.negativecentroid.get(termid);
-				sum=sum/neg_centroid_length;
-				sum= (Math.round(sum * 100000000) / 100000000.0);
-				obj.unit_negativecentroid.put(termid,sum);
-				
-				
-			}
-			
-			
-		/*	if(i<1)
-			{	//System.out.println(obj.positivecentroid);
-			System.out.println(obj.positivecentroid.size());
-			//System.out.println(obj.negativecentroid);
-			System.out.println(obj.negativecentroid.size());
-			  System.out.println(obj.documentIDs);
-			  System.out.println(poscount+" & "+ negcount);
-			}
-			*/
-			global_clusters[i++]= obj;
-				
-		}
+		}  // end of for each classlabel classifier
 	}
+
+
+	
+	
+	public static double vector_vector_multiplication(LinkedHashMap<Integer,Double> X ,LinkedHashMap<Integer,Double> Y )
+	{
+		double result; 
+		double xval;
+		double yval;
+		double sum=0;
+		for ( int key : X.keySet()){
+			 xval = X.get(key);
+			 yval = Y.get(key);
+			sum += (xval*yval);
+		}
+		result = sum;
+		return result;
+	}
+	
+	public static LinkedHashMap<Integer,Double> vector_minus_vector (LinkedHashMap<Integer,Double> X , LinkedHashMap<Integer,Double> Y){
+		LinkedHashMap<Integer,Double> result = new LinkedHashMap<Integer,Double>();
+		for( int rowkey : X.keySet()){
+			double xval = X.get(rowkey);
+			double yval = Y.get(rowkey);
+			result.put(rowkey, (xval-yval));
+		}
+		return result;
+	}
+	
+	public static LinkedHashMap<Integer,Double>  matrix_vector_multiplication(LinkedHashMap<Integer,LinkedHashMap<Integer,Double>> X ,LinkedHashMap<Integer,Double> W)
+	{		
+		LinkedHashMap<Integer,Double> result =  new LinkedHashMap<Integer,Double>();	
+			for(int rowno : X.keySet()){
+				
+				HashMap <Integer,Double> row = X.get(rowno);
+				double sum =0;
+				for ( Map.Entry<Integer,Double> m : row.entrySet()){
+					int termid = m.getKey();
+				    double	xtermvalue = m.getValue();
+			    	//if(Y.containsKey(termid)){
+					double wvalue = W.get(termid);
+			       //}
+				    sum+= xtermvalue*wvalue;
+				 }
+				
+				result.put(rowno,sum);
+			 }
+			return result;
+	}	
 	
 	class each_class{
 		ArrayList<Integer> documentIDs ;
-		
-	    HashMap<Integer,Double> positivecentroid = new HashMap<Integer,Double>() ;
-	    HashMap<Integer,Double> unit_positivecentroid = new HashMap<Integer,Double>();
-	    HashMap<Integer,Double> negativecentroid = new HashMap<Integer,Double>();
-	    HashMap<Integer,Double> unit_negativecentroid = new HashMap<Integer,Double>();
-	   String classlabel;
+		HashMap<Integer,Double> wscores = new HashMap<Integer,Double>() ;
+	    String classlabel;
 	   
 	}
 

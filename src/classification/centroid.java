@@ -7,7 +7,7 @@ import java.io.*;
 
 public class centroid {
 
-	static Map<Integer, HashMap<Integer, Integer>> docID_TF_Vector = new LinkedHashMap<Integer, HashMap<Integer,Integer>>();
+	static Map<Integer, HashMap<Integer, Double>> docID_TF_Vector = new LinkedHashMap<Integer, HashMap<Integer,Double>>();
 	//stores the document term frequency represented vectors
 	static Map<Integer, HashMap<Integer, Double>> unit_docID_TF_Vector = new LinkedHashMap<Integer, HashMap<Integer,Double>>();
 	//stores the document term frequency represented vectors normalised to unit length
@@ -28,12 +28,13 @@ public class centroid {
 	static HashMap<Integer,String> predicted_docID_classlabels = new LinkedHashMap<Integer,String>();
 	
 	static HashMap<String,ArrayList<Integer>> label_docids = new LinkedHashMap<String, ArrayList<Integer>>();
+	static int no_of_attributes = 291780;    //71944 / 291780
 	
 	static ArrayList<Integer> trainset = new ArrayList<Integer>();
 	static ArrayList<Integer> testset = new ArrayList<Integer>();
 	
 	static HashMap<String,Integer> classlabelmap = new LinkedHashMap<String,Integer>();
-	
+	static double[] termindex_IDF = new double [no_of_attributes];
 	static int feature_representation_option = 1 ;
 	static HashMap<String , Double>  class_maxf1value = new LinkedHashMap<String,Double> ();
 	
@@ -43,21 +44,61 @@ public class centroid {
 	static String feature_labelfile;
 	static String input_rlabelfile= "./20newsgroups.rlabel";
 	
-	static String inputfile= "./20newsgroups_word.ijv";
+	static String inputfile= "./20newsgroups_char.ijv";
 	
 	static each_class[] global_clusters = new each_class[20];
 	
 	public static void readinputfile () {
-		 System.out.println("\n Readling input file \n");
+		
+		// read file to populate training set
+				try {
+					BufferedReader br = new BufferedReader(new FileReader(trainfile));
+					String line = null;
+					int docid ;
+					while((line=br.readLine())!=null){
+						docid = Integer.parseInt(line);
+						trainset.add(docid);
+					}
+					
+				}catch (Exception e){
+					System.out.println("error reading trainfile");
+				}
+				
+				// read file to populate test set
+						try {
+							BufferedReader br = new BufferedReader(new FileReader(testfile));
+							String line = null;
+							int docid ;
+							while((line=br.readLine())!=null){
+								docid = Integer.parseInt(line);
+								testset.add(docid);
+							}
+							
+						}catch (Exception e){
+							System.out.println(e.getMessage());
+						}
+		
+		
+		 System.out.println("Readling input file ");
 		try{
 			BufferedReader br = new BufferedReader( new FileReader(inputfile));
 			String line = null;
-			int docid,termid,termfreq;
+			int docid,termid;
+			double termfreq;
 	        int vectorlength =0;
+	        int doccount=0;
+	        int[] term_doccount = new int [no_of_attributes];
 			while((line=br.readLine())!=null){
 				docid = Integer.parseInt(line.split(" ")[0]);
 				termid = Integer.parseInt(line.split(" ")[1]);
-				if( feature_representation_option ==1) {
+				if(trainset.contains(docid))
+				{ 
+			    	doccount = term_doccount[termid];
+				    doccount+=1;
+				    term_doccount[termid]=doccount;
+				}
+				   
+				if( feature_representation_option ==1  || feature_representation_option ==2  ) {
 					termfreq = Integer.parseInt(line.split(" ")[2]);
 				}
 				else
@@ -66,14 +107,14 @@ public class centroid {
 				}
 				
 				if(!docID_TF_Vector.containsKey(docid)){
-					HashMap<Integer,Integer> term_freq_vector = new HashMap<Integer,Integer>();
+					HashMap<Integer,Double> term_freq_vector = new HashMap<Integer,Double>();
 					term_freq_vector.put(termid, termfreq);
 				    docID_TF_Vector.put(docid, term_freq_vector);
 				    
 			    	vectorlength=0;
 				 }
 				else{
-			     	HashMap<Integer,Integer> word_vector = docID_TF_Vector.get(docid);
+			     	HashMap<Integer,Double> word_vector = docID_TF_Vector.get(docid);
 			    	word_vector.put(termid,termfreq);
 			    	docID_TF_Vector.put(docid,word_vector);
 			  
@@ -83,29 +124,78 @@ public class centroid {
 			
 			}
 			
+			
+			if(feature_representation_option==2){
+				
+				Arrays.fill(termindex_IDF, 1);
+				int totalnoofdocs = trainset.size();
+				int  D_t;
+				double IDF_t;
+				for(int i=0;i<no_of_attributes;i++){
+					D_t = term_doccount[i];
+					if( D_t != 0)
+					{ 
+						IDF_t =(  Math.log10((double)(totalnoofdocs/D_t))/ Math.log10(2));
+					    termindex_IDF[i]=IDF_t;
+					}
+				}
+				
+				
+				for(int documentid : docID_TF_Vector.keySet() ){                // multiply Tf by IDf
+					HashMap<Integer,Double> wordvector = docID_TF_Vector.get(documentid);
+					HashMap<Integer,Double> wordTFIDvector = new HashMap<Integer,Double>();
+				//	Double docvectorlength = docID_length.get(documentid);
+					for ( int wordid : wordvector.keySet()){
+						IDF_t = termindex_IDF[wordid];
+						
+				    	wordTFIDvector.put(wordid, wordvector.get(wordid)*IDF_t);
+						
+					}
+					docID_TF_Vector.put(documentid,wordTFIDvector);
+			
+				}
+				
+				double vlength=0;
+				double sum=0,val;         // find new length
+				HashMap<Integer,Double > temp = new LinkedHashMap<Integer,Double>();
+				for(Map.Entry<Integer,HashMap<Integer,Double>> m : docID_TF_Vector.entrySet()){
+					
+					temp = m.getValue();
+					sum=0;
+					vlength=0;
+					for(int wordid : temp.keySet()){
+						val= temp.get(wordid);
+						sum+= (val*val);
+						
+					}
+					vlength = Math.sqrt(sum);
+					docID_length.put(m.getKey(), vlength);
+				}
+				
+			}
+			
+			
+			
+			
 			for(int documentid : docID_TF_Vector.keySet() ){                // Normalise the document vectors
-				HashMap<Integer,Integer> wordvector = docID_TF_Vector.get(documentid);
+				HashMap<Integer,Double> wordvector = docID_TF_Vector.get(documentid);
 				HashMap<Integer,Double> unitwordvector = new HashMap<Integer,Double>();
 				Double docvectorlength = docID_length.get(documentid);
 				for ( int wordid : wordvector.keySet()){
 					unitwordvector.put(wordid, wordvector.get(wordid)/docvectorlength);
 				}
 				unit_docID_TF_Vector.put(documentid,unitwordvector);
-			//	if(documentid==5719){
-			//		System.out.println("for 5719 ");
-			//		System.out.println(wordvector);
-			//		System.out.println(docvectorlength);
-			//		System.out.println(unitwordvector);
-			//	} 
+		
 			}
-					
+			
+			
 		}
 		catch(Exception e){
-			System.out.println("file read error "+e.getMessage());
+			System.out.println("input file read error "); e.printStackTrace();
 		}
 		
 		
-		 System.out.println("\n Readling rlabel file \n");
+		 System.out.println("\nReadling rlabel file \n");
 		try {
 			BufferedReader br = new BufferedReader(new FileReader(input_rlabelfile));
 			String line = null;
@@ -139,41 +229,17 @@ public class centroid {
 		}
 		
 		
-		// read file to populate training set
-		try {
-			BufferedReader br = new BufferedReader(new FileReader(trainfile));
-			String line = null;
-			int docid ;
-			while((line=br.readLine())!=null){
-				docid = Integer.parseInt(line);
-				trainset.add(docid);
-			}
-			
-		}catch (Exception e){
-			System.out.println("error reading trainfile");
-		}
 		
-		// read file to populate test set
-				try {
-					BufferedReader br = new BufferedReader(new FileReader(testfile));
-					String line = null;
-					int docid ;
-					while((line=br.readLine())!=null){
-						docid = Integer.parseInt(line);
-						testset.add(docid);
-					}
-					
-				}catch (Exception e){
-					System.out.println(e.getMessage());
-				}
 		
 	}
 	
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
-		inputfile = "./20newsgroups_word.ijv";
+	//	inputfile = "./20newsgroups_word.ijv";
 	//	outputfile = "classification_colution";
+		long startTime = System.nanoTime();
+		
 		readinputfile();
 		
 		
@@ -183,14 +249,12 @@ public class centroid {
 		centroidobj.calc_centroid();
 		
 		System.out.println("Training phase done.. cetnroids found for 20 binary classifiers ");
-		System.out.println("testset len "+ testset.size());
+		
+		System.out.println("Performing classification on the test set.. ");
 		
 		HashMap<Integer,Double> docid_wscore = new HashMap<Integer,Double>(); 
 		
 		for ( int docid : testset){
-			if(docid == 5719){
-				System.out.println("inside testinf 5719 ");
-			}
 			double positive_similarity=0;
 			double negative_similarity=0;
 		
@@ -210,6 +274,7 @@ public class centroid {
 				}
 								
 			}
+		 //   System.out.println("assigned class to docid "+ docid);
 		
 			for(Map.Entry<String,Double> m:  class_wscores.entrySet()){
 				
@@ -237,26 +302,27 @@ public class centroid {
 	
 		
 		
-		System.out.println(" each test instance ran mm "+ predicted_docID_classlabels.size());
+		System.out.println("Completed classifying Test data .. writing output file ");
 		
 	//	for( Map.Entry m : predicted_docID_classlabels.entrySet()){
 	//		 System.out.println(m.getKey() + " - "+m.getValue());
 	//	}
 		
 		centroidobj.write_classification_outputfile(outputfile);
-		
+				
 		calc_accuracy();
+		System.out.println("\nPrinting the max F1 values for each class \n");
 		
 		calc_f1value();
 		
 		
-		System.out.println("\n Printing the max F1 values for each class ");
 	for ( Map.Entry<String,Double> m : class_maxf1value.entrySet()){
 		
 		System.out.println(m.getKey() +" - "+m.getValue());
 	}
 		
-		
+	long endTime = System.nanoTime();
+	System.out.println("Took "+((endTime - startTime)/1000000000) + " seconds"); 	
 		
 		
 	}   // End of main 
@@ -304,10 +370,11 @@ public class centroid {
 			  }
 			  
 			  f1values.add(F1_positive);
+			  
 			  if(classname.equalsIgnoreCase("comp.sys.ibm.pc.hardware") && flagcount <10 ){
 				 // System.out.println("docid - "+ docid+ "wscore "+" "+score+" f1value "+ F1_positive);
-				  System.out.println("docid - "+ docid+ "wscore "+" "+score+" f1value "+ F1_positive+ " prec "+prec_positive+ " rec "+rec_positive);
-			      System.out.println("TP "+TP+" FP "+ FP +" FN "+ FN);
+				//  System.out.println("docid - "+ docid+ "wscore "+" "+score+" f1value "+ F1_positive+ " prec "+prec_positive+ " rec "+rec_positive);
+			     // System.out.println("TP "+TP+" FP "+ FP +" FN "+ FN);
 			  }
 			  flagcount++;
 			}
@@ -398,8 +465,8 @@ public class centroid {
 			}
 		}
 		
-		double accuracy = (double)TP/x;
-		System.out.println("The accuracy is " + accuracy );
+		int accuracy =(int) (((double)TP/x) *100);
+		System.out.println("The accuracy is " + accuracy + " % ");
 	}
 	
 	
@@ -528,15 +595,7 @@ public class centroid {
 			}
 			
 			
-		/*	if(i<1)
-			{	//System.out.println(obj.positivecentroid);
-			System.out.println(obj.positivecentroid.size());
-			//System.out.println(obj.negativecentroid);
-			System.out.println(obj.negativecentroid.size());
-			  System.out.println(obj.documentIDs);
-			  System.out.println(poscount+" & "+ negcount);
-			}
-			*/
+		
 			global_clusters[i++]= obj;
 				
 		}
