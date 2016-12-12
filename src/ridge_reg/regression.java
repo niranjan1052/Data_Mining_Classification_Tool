@@ -1,11 +1,11 @@
-package classification;
+package ridge_reg;
 import javax.swing.text.Position; 
 
 import java.util.*;
 import java.util.Map.Entry;
 import java.io.*;
 
-public class centroid {
+public class regression {
 
 	static Map<Integer, HashMap<Integer, Integer>> docID_TF_Vector = new LinkedHashMap<Integer, HashMap<Integer,Integer>>();
 	//stores the document term frequency represented vectors
