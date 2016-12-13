@@ -348,15 +348,22 @@ public class regression {
 				   for(Map.Entry<Integer,Double> m : XdotWminusY.entrySet()){
 					
 					  total_error+= (m.getValue()*m.getValue());
+				    }
+				double wl2norm=0;
+				   for(Map.Entry<Integer, Double> m : W.entrySet()){
+					   
+					   wl2norm += ( m.getValue()*m.getValue());
 				   }
-				
-				   
+				   wl2norm *=lambda;
+				   total_error += total_error+wl2norm;
 				    System.out.println("\n Total least square error for iteration of i = "+ i+ " is "+ total_error);
 				    System.out.println("change in error is "+ (total_error-prev_error));
 				    if(total_error-prev_error<1 && total_error-prev_error>0){
 					  System.out.println("Coverged ");
 					  break;
 				    }
+				    
+				    
 				   prev_error= total_error;
 			      }
 			     featurecount++;
