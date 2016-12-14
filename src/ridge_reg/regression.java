@@ -44,7 +44,7 @@ public class regression {
 	
 	static HashMap<String,Integer> classlabelmap = new LinkedHashMap<String,Integer>();
 	
-	static int feature_representation_option = 1 ;
+	static int feature_representation_option = 1 ;                   // 1 for Term frequency
 	static HashMap<String , Double>  class_maxf1value = new LinkedHashMap<String,Double> ();
 	
 	static String outputfile="out.txt";
@@ -232,25 +232,7 @@ public class regression {
 		long endTime = System.nanoTime();
 		System.out.println("Took "+((endTime - startTime)/1000000000) + " seconds"); 
 		
-		
-		
-		
-	//	for( Map.Entry m : predicted_docID_classlabels.entrySet()){
-	//		 System.out.println(m.getKey() + " - "+m.getValue());
-	//	}
-		
-	//	centroidobj.write_classification_outputfile(outputfile);
-		
-	//	calc_accuracy();
-		
-//		calc_f1value();
-		
-		
-	//	System.out.println("\n Printing the max F1 values for each class ");
-//	for ( Map.Entry<String,Double> m : class_maxf1value.entrySet()){
-		
-//		System.out.println(m.getKey() +" - "+m.getValue());
-//	}
+	
 
 	
 	}   // End of main 
@@ -281,97 +263,126 @@ public class regression {
 			obj.documentIDs = label_docids.get(classname);
 			LinkedHashMap<Integer,Double> xitranspose = new LinkedHashMap<Integer,Double>();
 	     	LinkedHashMap<Integer,LinkedHashMap<Integer,Double>> X_i = new LinkedHashMap<Integer,LinkedHashMap<Integer,Double>>();
+	     	
 			LinkedHashMap<Integer,Double> W = new LinkedHashMap<Integer,Double>();
 			//stores the term or column number and its w value	
-			
-			for(int i=1;i<=no_of_attributes;i++){
+			int t=1;
+			for(t=1;t<=feature_labels.size();t++){
 				
-				W.put(i,0.3);
+				W.put(t,0.001);
 				
 			}
 			
-			System.out.println("done populating w");
+			System.out.println("done populating initial w");
 			double wdenominator,wnumerator,finalwi;
 			LinkedHashMap<Integer,Double> w_i = new LinkedHashMap<Integer,Double>();
 			int featurecount =0;
 			double total_error=0,prev_error=0;
-		    for(int i : feature_labels )
-		     {     // i is the column label or the termid / feature no from i,j,v file 
-		       // System.out.println("\n value of i -- " + i) ;
-			    w_i.putAll(W);
-			    for(int j : train_unit_docid_TF_Vecotr.keySet())   // j is the document id, so for each roc id i.e each row in matrix
-			      {  
-					HashMap<Integer,Double> row = train_unit_docid_TF_Vecotr.get(j);
-					if(row.get(i)!=null  )
-				      {	
-						
-						xitranspose.put(j, row.get(i));
-					  }
-										
-					LinkedHashMap<Integer,Double> rowwithoutcoli = new LinkedHashMap<Integer,Double>();
+			double currentwvalue ;
+			X_i.putAll(train_unit_docid_TF_Vecotr);
+			w_i.putAll(W);
+			System.out.println("feature_labels.size() "+w_i.size());
+			int iterationcount =0; 
+			LinkedHashMap<Integer,Double>  xi_dot_wi = matrix_vector_multiplication(X_i,w_i);    
+			
+			LinkedHashMap<Integer,Double> Xitransdotcurrentwi = new LinkedHashMap<Integer,Double>();
+			LinkedHashMap<Integer,Double> prevxidotwi = new LinkedHashMap<Integer,Double>();
+			for(Map.Entry<Integer, Double> m : xi_dot_wi.entrySet()){
+				prevxidotwi.put(m.getKey(), 0.0);
+			}
+			
+			for( iterationcount =0;iterationcount<10;iterationcount++)
+			{
 				
-				    for(Map.Entry<Integer,Double> m : row.entrySet()){
-				    	if(m.getKey()!=i)
-				    	{	
-				       	    rowwithoutcoli.put(m.getKey(), m.getValue());
-				    	}
-				     }
-			           // get the matrix without column i values  in X_i
-			       X_i.put(j, rowwithoutcoli);
+			     for(int i=1;i<=feature_labels.size();i++ )
+			      {     
+			    	 
+				       for(int j : train_unit_docid_TF_Vecotr.keySet())   // j is the document id, so for each roc id i.e each row in matrix
+					       {  
+							HashMap<Integer,Double> row = train_unit_docid_TF_Vecotr.get(j);
+							if(row.get(i)!=null  )
+						      {	
+								xitranspose.put(j, row.get(i));
+							  }else{
+								xitranspose.put(j, 0.0);
+							  }
 				 		
-			     }      // end of looping all rows for a column i
-				
-		         w_i.remove(i);
-								           
-	             LinkedHashMap<Integer,Double>  xi_dot_wi = matrix_vector_multiplication(X_i,w_i);        
-	             LinkedHashMap<Integer,Double> yminusxiwi = vector_minus_vector(ymatrix,xi_dot_wi);
-	         	           
-	             wnumerator = vector_vector_multiplication(xitranspose,yminusxiwi);
-	             wdenominator = vector_vector_multiplication(xitranspose,xitranspose);        
-	             wdenominator += lambda;
-	             finalwi  =  (double)wnumerator/wdenominator ; 
-	             //  global_w.add(finalwi);
-	             //  System.out.println("wi value for column no "+i+ " is  "+ finalwi);
-              
-	             W.put(i, finalwi);
-			     w_i.clear();
-			     X_i.clear();
-			     xitranspose.clear();
-			     //calculation of least square error 
-			     if(featurecount%1000 ==0 )
-			     { 
-				   LinkedHashMap<Integer,Double> XdotW  = matrix_vector_multiplication(train_unit_docid_TF_Vecotr, W); 
+					       }      // end of looping all rows for a column i
+						
+						if(i==71944){
+							System.out.println("  hh");
+						}
+						 currentwvalue = w_i.get(i);
+						 
+						 for(Map.Entry<Integer,Double> m : xitranspose.entrySet()){
+							 Xitransdotcurrentwi.put(m.getKey(), (m.getValue()*currentwvalue));
+						 }
+						double newval;
+						 for(Map.Entry<Integer,Double> m : xi_dot_wi.entrySet()){
+							 newval = m.getValue()- Xitransdotcurrentwi.get(m.getKey()) + prevxidotwi.get(m.getKey());
+							 xi_dot_wi.put(m.getKey(), (newval));
+						 }
+					
+				          
+			             LinkedHashMap<Integer,Double> yminusxiwi = vector_minus_vector(ymatrix,xi_dot_wi);
+			         	           
+			             wnumerator = vector_vector_multiplication(xitranspose,yminusxiwi);
+			             wdenominator = vector_vector_multiplication(xitranspose,xitranspose);        
+			             wdenominator += lambda;
+			             finalwi  =  (double)wnumerator/wdenominator ; 
+			           
+			             W.put(i, finalwi);
+			          
+			             w_i.put(i, finalwi);
+			             
+			             for(Map.Entry<Integer,Double> m : prevxidotwi.entrySet()){
+			            	 newval = xitranspose.get(m.getKey())*finalwi ;
+			            	 prevxidotwi.put(m.getKey(),newval);
+			             }
+			             
+					     X_i.clear();
+					     xitranspose.clear();
+					     //calculation of least square error 
+					    
+					     featurecount++;
+					    if(featurecount%1000==0){
+					    	System.out.println(" columns done "+ featurecount);
+					    }
+				   
+			        }   // end of loop calculation of new W for kth iteration
+		    
+		   
+		   
+				  LinkedHashMap<Integer,Double> XdotW  = matrix_vector_multiplication(train_unit_docid_TF_Vecotr, W); 
 			     
 				
-			       HashMap<Integer,Double> XdotWminusY = vector_minus_vector(XdotW,ymatrix);
-				    total_error=0;
-				   for(Map.Entry<Integer,Double> m : XdotWminusY.entrySet()){
+			      HashMap<Integer,Double> XdotWminusY = vector_minus_vector(XdotW,ymatrix);
+				  total_error=0;
+				  for(Map.Entry<Integer,Double> m : XdotWminusY.entrySet()){
 					
 					  total_error+= (m.getValue()*m.getValue());
 				    }
-				double wl2norm=0;
-				   for(Map.Entry<Integer, Double> m : W.entrySet()){
+				  double wl2norm=0;
+				  for(Map.Entry<Integer, Double> m : W.entrySet()){
 					   
 					   wl2norm += ( m.getValue()*m.getValue());
-				   }
+				    }
 				   wl2norm *=lambda;
 				   total_error += total_error+wl2norm;
-				    System.out.println("\n Total least square error for iteration of i = "+ i+ " is "+ total_error);
-				    System.out.println("change in error is "+ (total_error-prev_error));
-				    if(total_error-prev_error<1 && total_error-prev_error>0){
+				   System.out.println("\n Total least square error for iteration of i = "+ iterationcount+ " is "+ total_error);
+				   System.out.println("change in error is "+ (total_error-prev_error));
+				   if(Math.abs(total_error-prev_error)<1 && Math.abs(total_error-prev_error)>0){
 					  System.out.println("Coverged ");
-					  break;
+				    	  break;
 				    }
 				    
 				    
 				   prev_error= total_error;
-			      }
-			     featurecount++;
-			     if(featurecount>70000)
-				   break;
 			   
-			}   // end of calculation of wi for column i
-			global_clusters[classno++]= obj;
+		     
+	       }   // end of loop for k iterations to converge
+ 		     
+		   global_clusters[classno++]= obj;
 			
 		}  // end of for each classlabel classifier
 	}

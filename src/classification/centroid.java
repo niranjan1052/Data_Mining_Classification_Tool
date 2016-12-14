@@ -35,7 +35,7 @@ public class centroid {
 	
 	static HashMap<String,Integer> classlabelmap = new LinkedHashMap<String,Integer>();
 	static double[] termindex_IDF = new double [no_of_attributes];
-	static int feature_representation_option = 1 ;
+	static int feature_representation_option = 2 ;
 	static HashMap<String , Double>  class_maxf1value = new LinkedHashMap<String,Double> ();
 	
 	static String outputfile="out.txt";
@@ -44,7 +44,7 @@ public class centroid {
 	static String feature_labelfile;
 	static String input_rlabelfile= "./20newsgroups.rlabel";
 	
-	static String inputfile= "./20newsgroups_char.ijv";
+	static String inputfile= "./20newsgroups_word.ijv";
 	
 	static each_class[] global_clusters = new each_class[20];
 	
