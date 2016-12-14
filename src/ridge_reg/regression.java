@@ -293,7 +293,7 @@ public class regression {
 			
 			for( iterationcount =0;iterationcount<10;iterationcount++)
 			{
-				
+				  featurecount=0;
 			     for(int i=1;i<=feature_labels.size();i++ )
 			      {     
 			    	 
@@ -352,7 +352,7 @@ public class regression {
 			        }   // end of loop calculation of new W for kth iteration
 		    
 		   
-		   
+		         
 				  LinkedHashMap<Integer,Double> XdotW  = matrix_vector_multiplication(train_unit_docid_TF_Vecotr, W); 
 			     
 				
@@ -371,7 +371,7 @@ public class regression {
 				   total_error += total_error+wl2norm;
 				   System.out.println("\n Total least square error for iteration of i = "+ iterationcount+ " is "+ total_error);
 				   System.out.println("change in error is "+ (total_error-prev_error));
-				   if(Math.abs(total_error-prev_error)<1 && Math.abs(total_error-prev_error)>0){
+				   if(Math.abs(prev_error-total_error)<0.001 && Math.abs(prev_error-total_error)>0){
 					  System.out.println("Coverged ");
 				    	  break;
 				    }
